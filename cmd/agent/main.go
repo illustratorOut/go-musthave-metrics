@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -21,6 +22,11 @@ type MetricsCollector struct {
 
 // NewMetricsCollector создает новый сборщик метрик
 func NewMetricsCollector(serverURL string, pollInterval, reportInterval time.Duration) *MetricsCollector {
+	// Добавляем http:// если протокол не указан
+	if !strings.HasPrefix(serverURL, "http://") && !strings.HasPrefix(serverURL, "https://") {
+		serverURL = "http://" + serverURL
+	}
+
 	return &MetricsCollector{
 		serverURL:      serverURL,
 		pollInterval:   pollInterval,
