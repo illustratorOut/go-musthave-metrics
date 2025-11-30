@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -53,6 +54,19 @@ func (m *MemStorage) GetAllMetrics() (map[string]float64, map[string]int64) {
 var storage = NewMemStorage()
 
 func main() {
+	// Обработка флагов
+	var addr string
+	flag.StringVar(&addr, "a", "localhost:8080", "HTTP server endpoint address")
+	flag.Parse()
+
+	// Проверяем наличие неизвестных флагов
+	if flag.NArg() > 0 {
+		fmt.Printf("Error: unknown flag(s): %v\n", flag.Args())
+		return
+	}
+
+	fmt.Printf("Starting server on %s\n", addr)
+
 	router := gin.Default()
 
 	// Настраиваем шаблоны
@@ -128,7 +142,7 @@ func main() {
 		}
 	})
 
-	router.Run(":8080")
+	router.Run(addr)
 }
 
 // createTemplate создает HTML шаблон для отображения метрик

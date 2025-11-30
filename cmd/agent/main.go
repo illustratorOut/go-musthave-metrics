@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand/v2"
 	"net/http"
@@ -165,12 +166,39 @@ func (m *MetricsCollector) Start() {
 }
 
 func main() {
-	// Конфигурация по умолчанию
-	serverURL := "http://localhost:8080"
-	pollInterval := 2 * time.Second
-	reportInterval := 10 * time.Second
+	// Обработка флагов
+	var (
+		serverURL      string
+		pollInterval   int
+		reportInterval int
+	)
+
+	flag.StringVar(&serverURL, "a", "localhost:8080", "HTTP server endpoint address")
+	flag.IntVar(&pollInterval, "p", 2, "Poll interval in seconds (frequency of collecting metrics from runtime)")
+	flag.IntVar(&reportInterval, "r", 10, "Report interval in seconds (frequency of sending metrics to server)")
+	flag.Parse()
+
+	// Проверяем наличие неизвестных флагов
+	if flag.NArg() > 0 {
+		fmt.Printf("Error: unknown flag(s): %v\n", flag.Args())
+		return
+	}
+
+	// Проверяем корректность интервалов
+	if pollInterval <= 0 {
+		fmt.Printf("Error: poll interval must be positive, got %d\n", pollInterval)
+		return
+	}
+	if reportInterval <= 0 {
+		fmt.Printf("Error: report interval must be positive, got %d\n", reportInterval)
+		return
+	}
 
 	// Создаем и запускаем сборщик метрик
-	collector := NewMetricsCollector(serverURL, pollInterval, reportInterval)
+	collector := NewMetricsCollector(
+		serverURL,
+		time.Duration(pollInterval)*time.Second,
+		time.Duration(reportInterval)*time.Second,
+	)
 	collector.Start()
 }
