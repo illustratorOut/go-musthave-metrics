@@ -15,6 +15,7 @@ type MetricsCollector struct {
 	pollInterval   time.Duration
 	reportInterval time.Duration
 	pollCount      int64
+	httpClient     *http.Client
 }
 
 // NewMetricsCollector создает новый сборщик метрик
@@ -24,6 +25,7 @@ func NewMetricsCollector(serverURL string, pollInterval, reportInterval time.Dur
 		pollInterval:   pollInterval,
 		reportInterval: reportInterval,
 		pollCount:      0,
+		httpClient:     &http.Client{Timeout: 5 * time.Second},
 	}
 }
 
@@ -92,8 +94,7 @@ func (m *MetricsCollector) sendMetric(metricType, name string, value interface{}
 
 	req.Header.Set("Content-Type", "text/plain")
 
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := m.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -131,7 +132,6 @@ func (m *MetricsCollector) startPolling() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		// Просто собираем метрики, увеличивая pollCount
 		m.collectRuntimeMetrics()
 	}
 }
