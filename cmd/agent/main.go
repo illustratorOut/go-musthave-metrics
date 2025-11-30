@@ -130,12 +130,9 @@ func (m *MetricsCollector) startPolling() {
 	ticker := time.NewTicker(m.pollInterval)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			// Просто собираем метрики, увеличивая pollCount
-			m.collectRuntimeMetrics()
-		}
+	for range ticker.C {
+		// Просто собираем метрики, увеличивая pollCount
+		m.collectRuntimeMetrics()
 	}
 }
 
@@ -144,14 +141,11 @@ func (m *MetricsCollector) startReporting() {
 	ticker := time.NewTicker(m.reportInterval)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			if err := m.sendMetrics(); err != nil {
-				fmt.Printf("Error sending metrics: %v\n", err)
-			} else {
-				fmt.Printf("Metrics sent successfully at %s\n", time.Now().Format(time.RFC3339))
-			}
+	for range ticker.C {
+		if err := m.sendMetrics(); err != nil {
+			fmt.Printf("Error sending metrics: %v\n", err)
+		} else {
+			fmt.Printf("Metrics sent successfully at %s\n", time.Now().Format(time.RFC3339))
 		}
 	}
 }
