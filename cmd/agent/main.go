@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -74,7 +75,7 @@ func (m *MetricsCollector) collectRuntimeMetrics() map[string]interface{} {
 
 	// Добавляем дополнительные метрики
 	metrics["RandomValue"] = rand.Float64() // произвольное значение
-	m.pollCount++                           // увеличиваем счетчик опросов
+	atomic.AddInt64(&m.pollCount, 1)        // увеличиваем счетчик опросов
 
 	return metrics
 }
@@ -126,7 +127,7 @@ func (m *MetricsCollector) sendMetrics() error {
 	}
 
 	// Отправляем counter метрику PollCount
-	if err := m.sendMetric("counter", "PollCount", m.pollCount); err != nil {
+	if err := m.sendMetric("counter", "PollCount", atomic.LoadInt64(&m.pollCount)); err != nil {
 		return fmt.Errorf("failed to send counter metric PollCount: %v", err)
 	}
 
