@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"math/rand/v2"
 	"net/http"
+	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -135,41 +139,59 @@ func (m *MetricsCollector) sendMetrics() error {
 }
 
 // startPolling запускает периодический сбор метрик
-func (m *MetricsCollector) startPolling() {
+func (m *MetricsCollector) startPolling(ctx context.Context) {
 	ticker := time.NewTicker(m.pollInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		m.collectRuntimeMetrics()
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("Polling stopped")
+			return
+		case <-ticker.C:
+			m.collectRuntimeMetrics()
+		}
 	}
 }
 
 // startReporting запускает периодическую отправку метрик
-func (m *MetricsCollector) startReporting() {
+func (m *MetricsCollector) startReporting(ctx context.Context) {
 	ticker := time.NewTicker(m.reportInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		if err := m.sendMetrics(); err != nil {
-			fmt.Printf("Error sending metrics: %v\n", err)
-		} else {
-			fmt.Printf("Metrics sent successfully at %s\n", time.Now().Format(time.RFC3339))
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("Reporting stopped")
+			return
+		case <-ticker.C:
+			if err := m.sendMetrics(); err != nil {
+				fmt.Printf("Error sending metrics: %v\n", err)
+			} else {
+				fmt.Printf("Metrics sent successfully at %s\n", time.Now().Format(time.RFC3339))
+			}
 		}
 	}
 }
 
 // Start запускает сбор и отправку метрик
-func (m *MetricsCollector) Start() {
+func (m *MetricsCollector) Start(ctx context.Context) {
 	fmt.Printf("Starting metrics collector:\n")
 	fmt.Printf("  Server URL: %s\n", m.serverURL)
 	fmt.Printf("  Poll interval: %v\n", m.pollInterval)
 	fmt.Printf("  Report interval: %v\n", m.reportInterval)
 
-	go m.startPolling()
-	go m.startReporting()
+	// Создаем контекст для горутин
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	// Бесконечный цикл для поддержания работы приложения
-	select {}
+	// Запускаем горутины
+	go m.startPolling(ctx)
+	go m.startReporting(ctx)
+
+	// Ожидаем сигналов завершения
+	<-ctx.Done()
+	fmt.Println("Shutting down metrics collector...")
 }
 
 func main() {
@@ -201,11 +223,21 @@ func main() {
 		return
 	}
 
+	// Создаем контекст с обработкой сигналов
+	ctx, stop := signal.NotifyContext(context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
+	)
+	defer stop()
+
 	// Создаем и запускаем сборщик метрик
 	collector := NewMetricsCollector(
 		serverURL,
 		time.Duration(pollInterval)*time.Second,
 		time.Duration(reportInterval)*time.Second,
 	)
-	collector.Start()
+	collector.Start(ctx)
+
+	fmt.Println("Metrics collector stopped")
 }
