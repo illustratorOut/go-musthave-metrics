@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,6 +15,7 @@ import (
 type MemStorage struct {
 	gauges   map[string]float64
 	counters map[string]int64
+	mu       sync.RWMutex
 }
 
 // NewMemStorage создает новое хранилище
@@ -26,29 +28,51 @@ func NewMemStorage() *MemStorage {
 
 // UpdateGauge обновляет gauge метрику
 func (m *MemStorage) UpdateGauge(name string, value float64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.gauges[name] = value
 }
 
 // UpdateCounter обновляет counter метрику
 func (m *MemStorage) UpdateCounter(name string, value int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.counters[name] += value
 }
 
 // GetGauge возвращает значение gauge метрики
 func (m *MemStorage) GetGauge(name string) (float64, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	value, exists := m.gauges[name]
 	return value, exists
 }
 
 // GetCounter возвращает значение counter метрики
 func (m *MemStorage) GetCounter(name string) (int64, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	value, exists := m.counters[name]
 	return value, exists
 }
 
 // GetAllMetrics возвращает все метрики
 func (m *MemStorage) GetAllMetrics() (map[string]float64, map[string]int64) {
-	return m.gauges, m.counters
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Создаем копии карт, чтобы не возвращать внутренние структуры
+	gaugesCopy := make(map[string]float64, len(m.gauges))
+	for k, v := range m.gauges {
+		gaugesCopy[k] = v
+	}
+
+	countersCopy := make(map[string]int64, len(m.counters))
+	for k, v := range m.counters {
+		countersCopy[k] = v
+	}
+
+	return gaugesCopy, countersCopy
 }
 
 var storage = NewMemStorage()
